@@ -7,7 +7,7 @@
 #include "stm32f4xx_syscfg.h"
 #include "stm32f4xx_usart.h"
 #include "stm32f4xx_adc.h"
-
+#include "stm32f4xx_dma.h"
 
 
 int B1,B2,B3,B4;
@@ -16,18 +16,113 @@ int C1,C2,C3,C4;
 int D1,D2;
 int E1,E2;
 
-uint16_t ADC_Result2;
-uint16_t ADC_Result;
-uint16_t ADC_Result4;
-uint16_t ADC_Result3;
 
 char *adc1Analog1;
 char *adc2Analog1;
 char *adc1Analog2;
 char *adc2Analog2;
 
+#define ADC_1_ADDRESS_BASE 0x40012000
+//ADC_DR = ADC regular Data Register;
+#define ADC_DR_ADDRESS_OFFSET 0x4C
+volatile uint16_t valueFromADC[16];
+
+void MY_DMA_initP2M(void)
+{
+   	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
+   	DMA_InitTypeDef strukturaDoInicjalizacjiDMA;
+   	// wybór kanału DMA
+   	strukturaDoInicjalizacjiDMA.DMA_Channel = DMA_Channel_0;
+   	// ustalenie rodzaju transferu (memory2memory / peripheral2memory / memory2peripheral)
+   	strukturaDoInicjalizacjiDMA.DMA_DIR = DMA_DIR_PeripheralToMemory;
+   	// tryb pracy - pojedynczy transfer bądź powtarzany
+   	strukturaDoInicjalizacjiDMA.DMA_Mode = DMA_Mode_Circular;
+   	// ustalenie priorytetu danego kanału DMA
+   	strukturaDoInicjalizacjiDMA.DMA_Priority = DMA_Priority_Medium;
+   	// liczba danych do przesłania
+   	strukturaDoInicjalizacjiDMA.DMA_BufferSize = (uint32_t)4;
+   	// adres źródłowy
+   	strukturaDoInicjalizacjiDMA.DMA_PeripheralBaseAddr = (uint32_t)(ADC_1_ADDRESS_BASE+ADC_DR_ADDRESS_OFFSET);
+   	// adres docelowy
+   	strukturaDoInicjalizacjiDMA.DMA_Memory0BaseAddr = (uint32_t)&valueFromADC;
+   	// okreslenie, czy adresy mają być inkrementowane po każdej przesłanej paczce danych
+   	strukturaDoInicjalizacjiDMA.DMA_MemoryInc = DMA_MemoryInc_Enable;
+   	strukturaDoInicjalizacjiDMA.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+   	// ustalenie rozmiaru przesyłanych danych
+   	strukturaDoInicjalizacjiDMA.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+   	strukturaDoInicjalizacjiDMA.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+   	// ustalenie trybu pracy - jednorazwe przesłanie danych
+   	strukturaDoInicjalizacjiDMA.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+   	strukturaDoInicjalizacjiDMA.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+   	// wyłączenie kolejki FIFO (nie używana w tym przykadzie)
+   	strukturaDoInicjalizacjiDMA.DMA_FIFOMode = DMA_FIFOMode_Disable;
+   	// wypełnianie wszystkich pól struktury jest niezbędne w celu poprawnego działania, wpisanie jednej z dozwolonych wartosci
+   	strukturaDoInicjalizacjiDMA.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
+   	// zapisanie wypełnionej struktury do rejestrów wybranego połączenia DMA
+   	DMA_Init(DMA2_Stream4, &strukturaDoInicjalizacjiDMA);
+   	// uruchomienie odpowiedniego połączenia DMA
+   	DMA_Cmd(DMA2_Stream4, ENABLE);
+}
+
+void MY_ADC_init(void)
+{
+   	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB , ENABLE); // wejscie ADC
+   	//inicjalizacja wejścia ADC
+   	GPIO_InitTypeDef GPIO_InitStructure;
+   	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1|GPIO_Pin_2|GPIO_Pin_3|GPIO_Pin_4;
+   	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+   	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+   	GPIO_Init(GPIOA, &GPIO_InitStructure);
+   	ADC_CommonInitTypeDef ADC_CommonInitStructure;
+   	// niezależny tryb pracy przetworników
+   	ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
+   	// zegar główny podzielony przez 2
+   	ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
+   	// opcja istotna tylko dla tryby multi ADC
+   	ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
+   	// czas przerwy pomiędzy kolejnymi konwersjami
+   	ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
+   	ADC_CommonInit(&ADC_CommonInitStructure);
+   	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); //ADC
+   	ADC_InitTypeDef ADC_InitStructure;
+   	//ustawienie rozdzielczości przetwornika na maksymalną (12 bitów)
+   	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+   	//wyłączenie trybu skanowania (odczytywać będziemy jedno wejście ADC
+   	//w trybie skanowania automatycznie wykonywana jest konwersja na wielu //wejściach/kanałach)
+   	ADC_InitStructure.ADC_ScanConvMode = ENABLE;
+   	//włączenie ciągłego trybu pracy
+   	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
+   	//wyłączenie zewnętrznego wyzwalania
+   	//konwersja może być wyzwalana timerem, stanem wejścia itd. (szczegóły w //dokumentacji)
+   	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
+   	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
+   	//wartość binarna wyniku będzie podawana z wyrównaniem do prawej
+   	//funkcja do odczytu stanu przetwornika ADC zwraca wartość 16-bitową
+   	//dla przykładu, wartość 0xFF wyrównana w prawo to 0x00FF, w lewo 0x0FF0
+   	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+   	//liczba konwersji równa 1, bo 1 kanał
+   	ADC_InitStructure.ADC_NbrOfConversion = 4;
+   	// zapisz wypełnioną strukturę do rejestrów przetwornika numer 1
+   	ADC_Init(ADC1, &ADC_InitStructure);
+   	// konfiguracja czasu próbkowania sygnału
+   	ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_84Cycles);
+   	ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 2, ADC_SampleTime_84Cycles);
+   	ADC_RegularChannelConfig(ADC1, ADC_Channel_3, 3, ADC_SampleTime_84Cycles);
+   	ADC_RegularChannelConfig(ADC1, ADC_Channel_4, 4, ADC_SampleTime_84Cycles);
+   	// włączenie wyzwalania DMA po każdym zakończeniu konwersji
+   	ADC_DMARequestAfterLastTransferCmd(ADC1, ENABLE);
+
+   	// włączenie DMA dla ADC
+   	ADC_DMACmd(ADC1, ENABLE);
+   	// uruchomienie moduły ADC
+   	ADC_Cmd(ADC1, ENABLE);
+}
+
+
+
 void _GPIO_Init(void)
 {
+
 	GPIO_InitTypeDef GPIO_InitStructure;
 	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_10|GPIO_Pin_11;
 	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_AF;
@@ -36,22 +131,20 @@ void _GPIO_Init(void)
 	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_50MHz;
 	GPIO_Init(GPIOC,&GPIO_InitStructure);
 
-
-	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_13|GPIO_Pin_14;
-	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_NOPULL;
-	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz;
-	GPIO_Init(GPIOD,&GPIO_InitStructure);
-
-	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_2|GPIO_Pin_3|GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_6|
-			GPIO_Pin_7|GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_11|GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7|GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|
+			GPIO_Pin_11|GPIO_Pin_12|GPIO_Pin_15;
 	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_UP;
 	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz;
 	GPIO_Init(GPIOA,&GPIO_InitStructure);
 
+	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_11|GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_7|GPIO_Pin_8;
+	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_UP;
+	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz;
+	GPIO_Init(GPIOB,&GPIO_InitStructure);
 
 }
 
@@ -60,15 +153,13 @@ void _GPIO_AF_USART(void)
 	// ustawienie funkcji alternatywnej dla pinów (USART)
 	GPIO_PinAFConfig(GPIOC, GPIO_PinSource10, GPIO_AF_USART3);
 	GPIO_PinAFConfig(GPIOC, GPIO_PinSource11, GPIO_AF_USART3);
-	GPIO_PinAFConfig(GPIOC, GPIO_PinSource12, GPIO_AF_USART3);
-	GPIO_PinAFConfig(GPIOC, GPIO_PinSource13, GPIO_AF_USART3);
 }
 
 void _USART_Init(void)
 {
 	USART_InitTypeDef USART_InitStructure;
 	// predkosc transmisji (mozliwe standardowe opcje: 9600, 19200, 38400, 57600, 115200, ...)
-	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_BaudRate = 9600;
 	// długość słowa (USART_WordLength_8b lub USART_WordLength_9b)
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	// liczba bitów stopu (USART_StopBits_1, USART_StopBits_0_5, USART_StopBits_2, USART_StopBits_1_5)
@@ -119,72 +210,31 @@ void usartSendString(const char* s)
 		usartSendChar(*s++);
 }
 
-uint8_t usartGetChar(void)
-{
-	// czekaj na odebranie danych
-       while (USART_GetFlagStatus(USART3, USART_FLAG_RXNE) == RESET);
-
-   	return USART_ReceiveData(USART3);
-}
-
-void USART3_IRQHandler(void)
-{
-	// sprawdzenie flagi zwiazanej z odebraniem danych przez USART
-	if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
-	{
-
-		// odebrany bajt znajduje sie w rejestrze USART3->DR
-	}
-}
-
 void TIM3_IRQHandler(void)
 {
     if(TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
        {
 
-        ADC_SoftwareStartConv(ADC1);
-		while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
-		ADC_Result = ADC_GetConversionValue(ADC1);
+    	adc1Analog1 = malloc(6);
+    	snprintf(adc1Analog1, 6, "%d", valueFromADC[0]);
 
-		ADC_SoftwareStartConv(ADC2);
-		while(ADC_GetFlagStatus(ADC2, ADC_FLAG_EOC) == RESET);
-		ADC_Result2 = ADC_GetConversionValue(ADC2);
+    	adc2Analog1 = malloc(6);
+    	snprintf(adc2Analog1, 6 , "%d", valueFromADC[1]);
 
-		ADC_SoftwareStartConv(ADC3);
-		while(ADC_GetFlagStatus(ADC3, ADC_FLAG_EOC) == RESET);
-		ADC_Result3 = ADC_GetConversionValue(ADC3);
+    	adc1Analog2 = malloc(6);
+    	snprintf(adc1Analog2, 6, "%d", valueFromADC[2]);
 
-		//ADC_SoftwareStartConv(ADC4);
-		//while(ADC_GetFlagStatus(ADC4, ADC_FLAG_EOC) == RESET);
-		//ADC_Result4 = ADC_GetConversionValue(ADC4);
-
-
-		adc1Analog1 = malloc(6);
-		snprintf(adc1Analog1, 6, "%d", ADC_Result);
-
-		adc2Analog1 = malloc(6);
-		snprintf(adc2Analog1, 6 , "%d", ADC_Result2);
-
-		adc1Analog2 = malloc(6);
-		snprintf(adc1Analog2, 6, "%d", ADC_Result3);
-
-		//adc2Analog2 = malloc(6);
-		//snprintf(adc2Analog2, 6 , "%d", ADC_Result4);
-
-
-
-
-
-
+    	adc2Analog2 = malloc(6);
+    	snprintf(adc2Analog2, 6 , "%d", valueFromADC[3]);
 
  		usartSendString("OPEN!\r :");
 
 
- 		A1 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0);
- 		A2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_1);
- 		A3 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_2);
- 		A4 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_3);
- 		B1 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_4);
+ 		A1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_0);
+ 		A2 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_1);
+ 		A3 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_11);
+ 		A4 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_4);
+ 		B1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_5);
  		B2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_5);
  		B3 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_6);
  		B4 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_7);
@@ -193,9 +243,9 @@ void TIM3_IRQHandler(void)
  		C3 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_10);
  		C4 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_11);
  	 	D1 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_12);
- 	 	D2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_13);
- 	 	E1 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_14);
- 	 	E2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_15);
+ 	 	D2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_15);
+ 	 	E1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_7);
+ 	 	E2 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_8);
 
         if(A1 == 0){
          	usartSendString(" A1 == 0\r");
@@ -300,193 +350,67 @@ void TIM3_IRQHandler(void)
 		usartSendString(" Analog2 X: ");
 		usartSendString(adc1Analog2);
 		usartSendString(" Analog2 Y: ");
-		//usartSendString(adc2Analog2)
+		usartSendString(adc2Analog2);
 		usartSendString(" END\n");
 		free(adc1Analog1);
 		free(adc2Analog1);
 		free(adc1Analog2);
-		//free(adc2Analog2);
+		free(adc2Analog2);
 
        	TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
    	}
 }
 
+
 int main(void)
 {
 	SystemInit();
-	GPIO_InitTypeDef GPIO_InitStructure;
-	// wlaczenie taktowania wybranego portu
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
-	// wlaczenie taktowania wybranego układu USART
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
 
+		// wlaczenie taktowania wybranego portu
+		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+		// wlaczenie taktowania wybranego układu USART
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC2, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC3, ENABLE);
-	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC4, ENABLE);
+		TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+		/* Time base configuration */
+		TIM_TimeBaseStructure.TIM_Period = 9999;
+		TIM_TimeBaseStructure.TIM_Prescaler = 8399;
+		TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+		TIM_TimeBaseStructure.TIM_CounterMode =  TIM_CounterMode_Up;
+		TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
 
+		TIM_Cmd(TIM3, ENABLE);
 
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+		NVIC_InitTypeDef NVIC_InitStructure;
+			// numer przerwania
+		NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
+			// priorytet główny
+		NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x00;
+			// subpriorytet
+		NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00;
+			// uruchom dany kanał
+		NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+			// zapisz wypełnioną strukturę do rejestrów
+		NVIC_Init(&NVIC_InitStructure);
 
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-	/* Time base configuration */
-	TIM_TimeBaseStructure.TIM_Period = 999;
-	TIM_TimeBaseStructure.TIM_Prescaler = 8399;
-	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_TimeBaseStructure.TIM_CounterMode =  TIM_CounterMode_Up;
-	TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
+			// wyczyszczenie przerwania od timera 3 (wystąpiło przy konfiguracji timera)
+		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+				// zezwolenie na przerwania od przepełnienia dla timera 3
+		TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 
-	TIM_Cmd(TIM3, ENABLE);
+		_GPIO_Init();
+		_GPIO_AF_USART();
+		_USART_Init();
+		_NVIC_Init();
 
-	NVIC_InitTypeDef NVIC_InitStructure;
-		// numer przerwania
-	NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
-		// priorytet główny
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x00;
-		// subpriorytet
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00;
-		// uruchom dany kanał
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-		// zapisz wypełnioną strukturę do rejestrów
-	NVIC_Init(&NVIC_InitStructure);
+		MY_DMA_initP2M();
+		MY_ADC_init();
+		ADC_SoftwareStartConv(ADC1);
 
-		// wyczyszczenie przerwania od timera 3 (wystąpiło przy konfiguracji timera)
-	TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
-			// zezwolenie na przerwania od przepełnienia dla timera 3
-	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-
-	_GPIO_Init();
-	_GPIO_AF_USART();
-	_USART_Init();
-	_NVIC_Init();
-
-	//inicjalizacja wejścia ADC
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1|GPIO_Pin_2|GPIO_Pin_3|GPIO_Pin_4;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-	ADC_CommonInitTypeDef ADC_CommonInitStructure;
-	// niezależny tryb pracy przetworników
-	ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
-	// zegar główny podzielony przez 2
-	ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
-	// opcja istotna tylko dla trybu multi ADC
-	ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
-	// czas przerwy pomiędzy kolejnymi konwersjami
-	ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
-	ADC_CommonInit(&ADC_CommonInitStructure);
-
-
-	ADC_InitTypeDef ADC_InitStructure;
-	//ustawienie rozdzielczości przetwornika na maksymalną (12 bitów)
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-	//wyłączenie trybu skanowania (odczytywać będziemy jedno wejście ADC
-	//w trybie skanowania automatycznie wykonywana jest konwersja na wielu //wejściach/kanałach)
-	ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-	//włączenie ciągłego trybu pracy
-	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
-	//wyłączenie zewnętrznego wyzwalania
-	//konwersja może być wyzwalana timerem, stanem wejścia itd. (szczegóły w //dokumentacji)
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
-	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-	//wartość binarna wyniku będzie podawana z wyrównaniem do prawej
-	//funkcja do odczytu stanu przetwornika ADC zwraca wartość 16-bitową
-	//dla przykładu, wartość 0xFF wyrównana w prawo to 0x00FF, w lewo 0x0FF0
-	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	//liczba konwersji równa 1, bo 1 kanał
-	ADC_InitStructure.ADC_NbrOfConversion = 1;
-	// zapisz wypełnioną strukturę do rejestrów przetwornika numer 1
-	ADC_Init(ADC1, &ADC_InitStructure);
-
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_84Cycles);
-
-	//ustawienie rozdzielczości przetwornika na maksymalną (12 bitów)
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-	//wyłączenie trybu skanowania (odczytywać będziemy jedno wejście ADC
-	//w trybie skanowania automatycznie wykonywana jest konwersja na wielu //wejściach/kanałach)
-	ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-	//włączenie ciągłego trybu pracy
-	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
-	//wyłączenie zewnętrznego wyzwalania
-	//konwersja może być wyzwalana timerem, stanem wejścia itd. (szczegóły w //dokumentacji)
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
-	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-	//wartość binarna wyniku będzie podawana z wyrównaniem do prawej
-	//funkcja do odczytu stanu przetwornika ADC zwraca wartość 16-bitową
-	//dla przykładu, wartość 0xFF wyrównana w prawo to 0x00FF, w lewo 0x0FF0
-	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	//liczba konwersji równa 1, bo 1 kanał
-	ADC_InitStructure.ADC_NbrOfConversion = 1;
-	// zapisz wypełnioną strukturę do rejestrów przetwornika numer 1
-	ADC_Init(ADC2, &ADC_InitStructure);
-
-	ADC_RegularChannelConfig(ADC2, ADC_Channel_2,1 , ADC_SampleTime_84Cycles);
-
-	//ustawienie rozdzielczości przetwornika na maksymalną (12 bitów)
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-	//wyłączenie trybu skanowania (odczytywać będziemy jedno wejście ADC
-	//w trybie skanowania automatycznie wykonywana jest konwersja na wielu //wejściach/kanałach)
-	ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-	//włączenie ciągłego trybu pracy
-	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
-	//wyłączenie zewnętrznego wyzwalania
-	//konwersja może być wyzwalana timerem, stanem wejścia itd. (szczegóły w //dokumentacji)
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
-	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-	//wartość binarna wyniku będzie podawana z wyrównaniem do prawej
-	//funkcja do odczytu stanu przetwornika ADC zwraca wartość 16-bitową
-	//dla przykładu, wartość 0xFF wyrównana w prawo to 0x00FF, w lewo 0x0FF0
-	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	//liczba konwersji równa 1, bo 1 kanał
-	ADC_InitStructure.ADC_NbrOfConversion = 1;
-	// zapisz wypełnioną strukturę do rejestrów przetwornika numer 1
-	ADC_Init(ADC3, &ADC_InitStructure);
-
-	ADC_RegularChannelConfig(ADC3, ADC_Channel_3,1 , ADC_SampleTime_84Cycles);
-/*
-	//ustawienie rozdzielczości przetwornika na maksymalną (12 bitów)
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-	//wyłączenie trybu skanowania (odczytywać będziemy jedno wejście ADC
-	//w trybie skanowania automatycznie wykonywana jest konwersja na wielu //wejściach/kanałach)
-	ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-	//włączenie ciągłego trybu pracy
-	ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
-	//wyłączenie zewnętrznego wyzwalania
-	//konwersja może być wyzwalana timerem, stanem wejścia itd. (szczegóły w //dokumentacji)
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
-	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-	//wartość binarna wyniku będzie podawana z wyrównaniem do prawej
-	//funkcja do odczytu stanu przetwornika ADC zwraca wartość 16-bitową
-	//dla przykładu, wartość 0xFF wyrównana w prawo to 0x00FF, w lewo 0x0FF0
-	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	//liczba konwersji równa 1, bo 1 kanał
-	ADC_InitStructure.ADC_NbrOfConversion = 1;
-	// zapisz wypełnioną strukturę do rejestrów przetwornika numer 1
-	ADC_Init(ADC4, &ADC_InitStructure);*/
-
-	//ADC_RegularChannelConfig(ADC4, ADC_Channel_4,1 , ADC_SampleTime_84Cycles);
-
-	ADC_Cmd(ADC1, ENABLE);
-	ADC_Cmd(ADC2, ENABLE);
-	ADC_Cmd(ADC3, ENABLE);
-	//ADC_Cmd(ADC4, ENABLE);
-
-
-
-
-
-	USART_Cmd(USART3, ENABLE);
-
+		USART_Cmd(USART3, ENABLE);
 
 
 	while(1)
