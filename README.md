@@ -16,7 +16,7 @@ STM32 programme wrote in C (CooCox CoIDE Version: 1.7.8). The PC application was
 
 How to run
 
-Connect the external power (Powerbank). Pair your PC with the HC SR-06 module. Pass 1234 as the PIN number. Open your app, connect to device, pick the Bluetooth module.
+Connect the external power (Powerbank). Pair your PC with the HC SR-06 module. Pass 1234 as the PIN number. Open your app, pick the port COM.
 
 How to compile
 
