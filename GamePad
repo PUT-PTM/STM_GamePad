@@ -14,8 +14,6 @@ int B1,B2,B3,B4;
 int A1,A2,A3,A4;
 int C1,C2,C3,C4;
 int D1,D2;
-int E1,E2;
-
 
 char *adc1Analog1;
 char *adc2Analog1;
@@ -227,7 +225,7 @@ void TIM3_IRQHandler(void)
     	adc2Analog2 = malloc(6);
     	snprintf(adc2Analog2, 6 , "%d", valueFromADC[3]);
 
- 		usartSendString("OPEN!\r :");
+ 		usartSendString("O\r");
 
 
  		A1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_0);
@@ -241,117 +239,103 @@ void TIM3_IRQHandler(void)
  		C1 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_8);
  		C2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_9);
  		C3 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_10);
- 		C4 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_11);
- 	 	D1 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_12);
+ 		C4 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_7);
+ 	 	D1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_8);
  	 	D2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_15);
- 	 	E1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_7);
- 	 	E2 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_8);
 
         if(A1 == 0){
-         	usartSendString(" A1 == 0\r");
+         	usartSendString("A1=0\r");
        		}
         else{
-         	usartSendString(" A1 == 1\r");
+         	usartSendString("A1=1\r");
          	}
    		if(A2 == 0){
-			usartSendString(" A2 == 0\r");
+			usartSendString("A2=0\r");
 			}
    		else{
-   			usartSendString(" A2 == 1\r");
+   			usartSendString("A2=1\r");
    			}
    		if(A3 == 0){
-   			usartSendString(" A3 == 0\r");
+   			usartSendString("A3=0\r");
        		}
    		else{
-         	usartSendString(" A3 == 1\r");
+         	usartSendString("A3=1\r");
    			}
    		if(A4 == 0){
-   			usartSendString(" A4 == 0\r");
+   			usartSendString("A4=0\r");
    			}
    		else{
-   			usartSendString(" A4 == 1\r");
+   			usartSendString("A4=1\r");
    			}
    		if(B1 == 0){
-   			usartSendString(" B1 == 0\r");
+   			usartSendString("B1=0\r");
        		}
    		else{
-   			usartSendString(" B1 == 1\r");
+   			usartSendString("B1=1\r");
            	}
    		if(B2 == 0){
-   			usartSendString(" B2 == 0\r");
+   			usartSendString("B2=0\r");
    			}
    		else{
-   			usartSendString(" B2 == 1\r");
+   			usartSendString("B2=1\r");
    			}
    		if(B3 == 0){
-   			usartSendString(" B3 == 0\r");
+   			usartSendString("B3=0\r");
    			}
    		else{
-   			usartSendString(" B3 == 1\r");
+   			usartSendString("B3=1\r");
            	}
    		if(B4 == 0){
-   			usartSendString(" B4 == 0\r");
+   			usartSendString("B4=0\r");
    			}
    		else{
-   			usartSendString(" B4 == 1\r");
+   			usartSendString("B4=1\r");
    			}
        	if(C1 == 0){
-       		usartSendString(" C1 == 0\r");
+       		usartSendString("C1=0\r");
        		}
        	else{
-       		usartSendString(" C1 == 1\r");
+       		usartSendString("C1=1\r");
        		}
        	if(C2 == 0){
-       		usartSendString(" C2 == 0\r");
+       		usartSendString("C2=0\r");
        		}
        	else{
-       		usartSendString(" C2 == 1\r");
+       		usartSendString("C2=1\r");
        		}
        	if(C3 == 0){
-       		usartSendString(" C3 == 0\r");
+       		usartSendString("C3=0\r");
        		}
        	else{
-       		usartSendString(" C3 == 1\r");
+       		usartSendString("C3=1\r");
        		}
        	if(C4 == 0){
-       		usartSendString(" C4 == 0\r");
+       		usartSendString("C4=0\r");
        		}
        	else{
-       		usartSendString(" C4 == 1\r");
+       		usartSendString("C4=1\r");
        		}
        	if(D1 == 0){
-       		usartSendString(" D1 == 0\r");
+       		usartSendString("D1=0\r");
        		}
        	else{
-       		usartSendString(" D1 == 1\r");
+       		usartSendString("D1=1\r");
        		}
        	if(D2 == 0){
-       		usartSendString(" D2 == 0\r");
+       		usartSendString("D2=0\r");
        		}
        	else{
-       		usartSendString(" D2 == 1\r");
+       		usartSendString("D2=1\r");
        		}
-       	if(E1 == 0){
-       		usartSendString(" E1 == 0\r");
-       		}
-       	else{
-       		usartSendString(" E1 == 1\r");
-       		}
-       	if(E2 == 0){
-       		usartSendString(" E2 == 0\r");
-       		}
-       	else{
-       		usartSendString(" E2 == 1\r");
-       		}
-		usartSendString(" Analog1 X: ");
+		usartSendString("AN1X=");
 		usartSendString(adc1Analog1);
-		usartSendString(" Analog1 Y: ");
+		usartSendString("AN1Y=");
 		usartSendString(adc2Analog1);
-		usartSendString(" Analog2 X: ");
+		usartSendString("AN2X=");
 		usartSendString(adc1Analog2);
-		usartSendString(" Analog2 Y: ");
+		usartSendString("AN2Y=");
 		usartSendString(adc2Analog2);
-		usartSendString(" END\n");
+		usartSendString("!\n");
 		free(adc1Analog1);
 		free(adc2Analog1);
 		free(adc1Analog2);
