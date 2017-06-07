@@ -225,7 +225,7 @@ void TIM3_IRQHandler(void)
     	adc2Analog2 = malloc(6);
     	snprintf(adc2Analog2, 6 , "%d", valueFromADC[3]);
 
- 		usartSendString("O\r");
+ 		usartSendString("O");
 
 
  		A1 = GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_0);
@@ -244,88 +244,88 @@ void TIM3_IRQHandler(void)
  	 	D2 = GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_15);
 
         if(A1 == 0){
-         	usartSendString("A1=0\r");
+         	usartSendString("A1=0");
        		}
         else{
-         	usartSendString("A1=1\r");
+         	usartSendString("A1=1");
          	}
    		if(A2 == 0){
-			usartSendString("A2=0\r");
+			usartSendString("A2=0");
 			}
    		else{
-   			usartSendString("A2=1\r");
+   			usartSendString("A2=1");
    			}
    		if(A3 == 0){
-   			usartSendString("A3=0\r");
+   			usartSendString("A3=0");
        		}
    		else{
-         	usartSendString("A3=1\r");
+         	usartSendString("A3=1");
    			}
    		if(A4 == 0){
-   			usartSendString("A4=0\r");
+   			usartSendString("A4=0");
    			}
    		else{
-   			usartSendString("A4=1\r");
+   			usartSendString("A4=1");
    			}
    		if(B1 == 0){
-   			usartSendString("B1=0\r");
+   			usartSendString("B1=0");
        		}
    		else{
-   			usartSendString("B1=1\r");
+   			usartSendString("B1=1");
            	}
    		if(B2 == 0){
-   			usartSendString("B2=0\r");
+   			usartSendString("B2=0");
    			}
    		else{
-   			usartSendString("B2=1\r");
+   			usartSendString("B2=1");
    			}
    		if(B3 == 0){
-   			usartSendString("B3=0\r");
+   			usartSendString("B3=0");
    			}
    		else{
-   			usartSendString("B3=1\r");
+   			usartSendString("B3=1");
            	}
    		if(B4 == 0){
-   			usartSendString("B4=0\r");
+   			usartSendString("B4=0");
    			}
    		else{
-   			usartSendString("B4=1\r");
+   			usartSendString("B4=1");
    			}
        	if(C1 == 0){
-       		usartSendString("C1=0\r");
+       		usartSendString("C1=0");
        		}
        	else{
-       		usartSendString("C1=1\r");
+       		usartSendString("C1=1");
        		}
        	if(C2 == 0){
-       		usartSendString("C2=0\r");
+       		usartSendString("C2=0");
        		}
        	else{
-       		usartSendString("C2=1\r");
+       		usartSendString("C2=1");
        		}
        	if(C3 == 0){
-       		usartSendString("C3=0\r");
+       		usartSendString("C3=0");
        		}
        	else{
-       		usartSendString("C3=1\r");
+       		usartSendString("C3=1");
        		}
        	if(C4 == 0){
-       		usartSendString("C4=0\r");
+       		usartSendString("C4=0");
        		}
        	else{
-       		usartSendString("C4=1\r");
+       		usartSendString("C4=1");
        		}
        	if(D1 == 0){
-       		usartSendString("D1=0\r");
+       		usartSendString("D1=0");
        		}
        	else{
-       		usartSendString("D1=1\r");
+       		usartSendString("D1=1");
        		}
        	if(D2 == 0){
-       		usartSendString("D2=0\r");
+       		usartSendString("D2=0");
        		}
        	else{
-       		usartSendString("D2=1\r");
+       		usartSendString("D2=1");
        		}
 		usartSendString("AN1X=");
 		usartSendString(adc1Analog1);
